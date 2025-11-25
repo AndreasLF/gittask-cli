@@ -86,6 +86,9 @@ class AsanaClient:
         """
         Post a comment to a task.
         """
+        if not text.startswith("<body>"):
+            text = f"<body>{text}</body>"
+            
         body = {"data": {"html_text": text}}
         self.stories_api.create_story_for_task(body, task_gid, opts={})
 
