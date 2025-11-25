@@ -94,7 +94,19 @@ def push(
                 with AsanaClient(token) as client:
                     # Build comment
                     # Get repo URL for links
-                    repo_url = "https://github.com/AndreasLF/gittask" # TODO: Get this dynamically if possible
+                    remote_url = git.get_remote_url(remote)
+                    repo_url = remote_url
+                    
+                    if remote_url:
+                        # Convert SSH to HTTPS if needed
+                        if remote_url.startswith("git@"):
+                            repo_url = remote_url.replace(":", "/").replace("git@", "https://")
+                        
+                        # Remove .git suffix
+                        if repo_url.endswith(".git"):
+                            repo_url = repo_url[:-4]
+                    else:
+                        repo_url = "https://github.com/AndreasLF/gittask" # Fallback
                     
                     lines = [f"<body><h1>🚀 Pushed to <code>{target_branch}</code></h1><ul>"]
                     for c in commits:
