@@ -96,12 +96,13 @@ def push(
                     # Get repo URL for links
                     repo_url = "https://github.com/AndreasLF/gittask" # TODO: Get this dynamically if possible
                     
-                    lines = [f"🚀 **Pushed to `{target_branch}`**"]
+                    lines = [f"<body><h1>🚀 Pushed to <code>{target_branch}</code></h1><ul>"]
                     for c in commits:
                         url = f"{repo_url}/commit/{c['hash']}"
-                        lines.append(f"• [`{c['hash']}`]({url}) - {c['message']}")
+                        lines.append(f"<li><a href=\"{url}\">{c['hash']}</a> - {c['message']}</li>")
+                    lines.append("</ul></body>")
                     
-                    comment_text = "\n".join(lines)
+                    comment_text = "".join(lines)
                     client.post_comment(task_info['asana_task_gid'], comment_text)
                     console.print(f"[green]Posted push summary to Asana task: {task_info['asana_task_name']}[/green]")
             except Exception as e:
