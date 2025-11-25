@@ -109,7 +109,8 @@ def push(
                         # No fallback, raise error
                         raise typer.Exit(code=1)
                     
-                    lines = [f"<body><h1>🚀 Pushed to <code>{target_branch}</code></h1><ul>"]
+                    branch_url = f"{repo_url}/tree/{target_branch}"
+                    lines = [f"<body><h1>🚀 Pushed to <a href=\"{branch_url}\">{target_branch}</a></h1><ul>"]
                     for c in commits:
                         url = f"{repo_url}/commit/{c['hash']}"
                         lines.append(f"<li><a href=\"{url}\">{c['hash']}</a> - {c['message']}</li>")
