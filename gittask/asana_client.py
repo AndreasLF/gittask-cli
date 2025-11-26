@@ -89,9 +89,9 @@ class AsanaClient:
         """
         
         if not text.startswith("<body>"):
-            text = f"<body>{text}\n🤖 created with gittask cli tool</body>"
+            text = f"<body>{text}\n🤖 created with <code>gittask</code> cli tool</body>"
         else:
-            text = text.replace("</body>", f"\n🤖 created with gittask cli tool</body>")
+            text = text.replace("</body>", f"\n🤖 created with <code>gittask</code> cli tool</body>")
             
         body = {"data": {"html_text": text}}
         self.stories_api.create_story_for_task(body, task_gid, opts={})
