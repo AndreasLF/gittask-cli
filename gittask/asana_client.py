@@ -80,15 +80,18 @@ class AsanaClient:
         if not time_str:
             time_str.append("< 1m")
             
-        text = f"⏱️ Worked {' '.join(time_str)} on branch `{branch_name}`."
+        text = f"⏱️ Worked {' '.join(time_str)} on branch <code>{branch_name}</code>."
         self.post_comment(task_gid, text)
 
     def post_comment(self, task_gid: str, text: str):
         """
         Post a comment to a task.
         """
+        
         if not text.startswith("<body>"):
-            text = f"<body>{text}</body>"
+            text = f"<body>{text}\n🤖 created with <a href='https://github.com/AndreasLF/gittask'>gittask cli tool</a></body>"
+        else:
+            text = text.replace("</body>", f"\n🤖 created with <a href='https://github.com/AndreasLF/gittask'>gittask cli tool</a></body>")
             
         body = {"data": {"html_text": text}}
         self.stories_api.create_story_for_task(body, task_gid, opts={})
