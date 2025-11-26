@@ -107,7 +107,7 @@ def create(
             if token:
                 try:
                     with AsanaClient(token) as client:
-                        comment_text = f"🔗 **Pull Request Created**\n\n<a href=\"{pr.html_url}\">{pr.title} (#{pr.number})</a>"
+                        comment_text = f"🔗 <strong>Pull Request Created</strong>\n\n<a href=\"{pr.html_url}\">{pr.title} (#{pr.number})</a>"
                         client.post_comment(task_info['asana_task_gid'], comment_text)
                         console.print(f"[green]Posted PR link to Asana task: {task_info['asana_task_name']}[/green]")
                 except Exception as e:

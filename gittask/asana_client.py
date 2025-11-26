@@ -80,54 +80,17 @@ class AsanaClient:
         if not time_str:
             time_str.append("< 1m")
             
-        text = f"⏱️ Worked {' '.join(time_str)} on branch `{branch_name}`."
+        text = f"⏱️ Worked {' '.join(time_str)} on branch <code>{branch_name}</code>."
         self.post_comment(task_gid, text)
 
     def post_comment(self, task_gid: str, text: str):
         """
         Post a comment to a task.
-        Converts basic markdown to HTML and appends signature.
         """
-        import re
-        
-        html_text = text.strip()
-        
-        # If it's not already HTML (rudimentary check), convert markdown
-        if not html_text.startswith("<body>"):
-            # Newlines
-            html_text = html_text.replace("\n", "<br/>")
+        if not text.startswith("<body>"):
+            text = f"<body>{text}</body>"
             
-            # Bold **text** -> <strong>text</strong>
-            html_text = re.sub(r'\*\*(.*?)\*\*', r'<strong>\1</strong>', html_text)
-            
-            # Italic *text* -> <em>text</em>
-            html_text = re.sub(r'\*(.*?)\*', r'<em>\1</em>', html_text)
-            
-            # Code `text` -> <code>text</code>
-            html_text = re.sub(r'`(.*?)`', r'<code>\1</code>', html_text)
-            
-            # Links [text](url) -> <a href="url">text</a>
-            html_text = re.sub(r'\[(.*?)\]\((.*?)\)', r'<a href="\2">\1</a>', html_text)
-
-        # Append Signature
-        # Asana only supports: <body>, <strong>, <em>, <u>, <s>, <code>, <ol>, <ul>, <li>, <a>, <blockquote>, <pre>
-        # We use <em> for a subtle look.
-        signature = "\n\n<em>🤖 created with gittask cli tool</em>"
-        
-        if signature not in html_text:
-            if html_text.endswith("</body>"):
-                # It's HTML. Use <br>
-                sig_html = "<br/><br/><em>🤖 created with gittask cli tool</em>"
-                # Use replace to be safe against slicing errors if logic changes
-                html_text = html_text.replace("</body>", sig_html + "</body>")
-            else:
-                # It's plain text / markdown converted above.
-                html_text += "<br/><br/><em>🤖 created with gittask cli tool</em>"
-            
-        if not html_text.startswith("<body>"):
-            html_text = f"<body>{html_text}</body>"
-            
-        body = {"data": {"html_text": html_text}}
+        body = {"data": {"html_text": text}}
         self.stories_api.create_story_for_task(body, task_gid, opts={})
 
     def complete_task(self, task_gid: str):
