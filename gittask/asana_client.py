@@ -97,11 +97,11 @@ class AsanaClient:
             # Newlines
             html_text = html_text.replace("\n", "<br/>")
             
-            # Bold **text** -> <b>text</b>
-            html_text = re.sub(r'\*\*(.*?)\*\*', r'<b>\1</b>', html_text)
+            # Bold **text** -> <strong>text</strong>
+            html_text = re.sub(r'\*\*(.*?)\*\*', r'<strong>\1</strong>', html_text)
             
-            # Italic *text* -> <i>text</i>
-            html_text = re.sub(r'\*(.*?)\*', r'<i>\1</i>', html_text)
+            # Italic *text* -> <em>text</em>
+            html_text = re.sub(r'\*(.*?)\*', r'<em>\1</em>', html_text)
             
             # Code `text` -> <code>text</code>
             html_text = re.sub(r'`(.*?)`', r'<code>\1</code>', html_text)
@@ -110,12 +110,36 @@ class AsanaClient:
             html_text = re.sub(r'\[(.*?)\]\((.*?)\)', r'<a href="\2">\1</a>', html_text)
 
         # Append Signature
-        signature = "<br/><br/><small><i>🤖 created with gittask cli tool</i></small>"
+        # Asana only supports: <body>, <strong>, <em>, <u>, <s>, <code>, <ol>, <ul>, <li>, <a>, <blockquote>, <pre>
+        # We use <em> for a subtle look.
+        signature = "\n\n<em>🤖 created with gittask cli tool</em>"
+        
+        # We need to handle newlines for the signature if we are appending to HTML that might not have breaks
+        # But wait, if we are appending to HTML, we should use <br> if it's inside body?
+        # The text input might be HTML (from push) or Markdown (from pr).
+        
+        # If it starts with body, it's likely HTML from push.py
+        if text.strip().startswith("<body>"):
+             # push.py generates <body>...</body>
+             # We need to insert before </body>
+             pass
+        
+        # Let's standardize.
+        
         if signature not in html_text:
             if html_text.endswith("</body>"):
-                html_text = html_text[:-7] + signature + "</body>"
+                # It's HTML. Use <br>
+                # Note: push.py uses <ul><li>...</li></ul></body>
+                # We want to add it after the list? Or just at the end.
+                # Let's add it at the end of body.
+                # We need <br> because it's HTML.
+                sig_html = "<br/><br/><em>🤖 created with gittask cli tool</em>"
+                html_text = html_text[:-7] + sig_html + "</body>"
             else:
-                html_text += signature
+                # It's plain text / markdown converted above.
+                # We already replaced \n with <br/> above if it wasn't body.
+                # So we should use <br/> here too.
+                html_text += "<br/><br/><em>🤖 created with gittask cli tool</em>"
             
         if not html_text.startswith("<body>"):
             html_text = f"<body>{html_text}</body>"
