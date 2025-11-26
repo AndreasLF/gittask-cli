@@ -87,12 +87,11 @@ class AsanaClient:
         """
         Post a comment to a task.
         """
-        # append signature to body 
-        signature = "<br><br><em>🤖 created with gittask cli tool</em>"
-        text += signature
         
         if not text.startswith("<body>"):
-            text = f"<body>{text}</body>"
+            text = f"<body>{text}<br><br><em>🤖 created with gittask cli tool</em></body>"
+        else:
+            text = text.replace("</body>", f"<br><br><em>🤖 created with gittask cli tool</em></body>")
             
         body = {"data": {"html_text": text}}
         self.stories_api.create_story_for_task(body, task_gid, opts={})
