@@ -26,7 +26,7 @@ Imagine this: You grab your coffee ☕ and sit down to tackle a new feature.
 ### 1. Installation
 
 ```bash
-pip install ???
+pip install gittask-cli
 ```
 
 ### 2. Authentication
