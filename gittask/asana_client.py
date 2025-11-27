@@ -14,6 +14,8 @@ class AsanaClient:
         self.workspaces_api = asana.WorkspacesApi(self.api_client)
         self.projects_api = asana.ProjectsApi(self.api_client)
         self.tags_api = asana.TagsApi(self.api_client)
+        self.custom_fields_api = asana.CustomFieldsApi(self.api_client)
+        self.time_tracking_api = asana.TimeTrackingEntriesApi(self.api_client)
         self.typeahead_api = asana.TypeaheadApi(self.api_client)
         
         # Get current user
@@ -107,6 +109,10 @@ class AsanaClient:
         result = self.workspaces_api.get_workspaces(opts={})
         return list(result)
 
+    def get_workspace_by_gid(self, workspace_gid: str) -> Dict:
+        result = self.workspaces_api.get_workspace(workspace_gid, opts={})
+        return result
+
     def get_projects(self, workspace_gid: str) -> List[Dict]:
         result = self.projects_api.get_projects_for_workspace(workspace_gid, opts={})
         return list(result)
@@ -155,3 +161,42 @@ class AsanaClient:
         """
         body = {"data": {"assignee": assignee_gid}}
         self.tasks_api.update_task(body, task_gid, opts={})
+
+    def get_custom_fields(self, workspace_gid: str) -> List[Dict]:
+        """
+        Get all custom fields in the workspace.
+        """
+        result = self.custom_fields_api.get_custom_fields_for_workspace(workspace_gid, opts={'opt_fields': 'name,gid,type,enum_options'})
+        return list(result)
+
+    def get_task_with_fields(self, task_gid: str) -> Dict:
+        """
+        Get a task with all its custom fields.
+        """
+        opts = {'opt_fields': 'name,custom_fields.name,custom_fields.gid,custom_fields.type,custom_fields.display_value,custom_fields.number_value,actual_time_minutes'}
+        return self.tasks_api.get_task(task_gid, opts=opts)
+
+    def get_actual_time(self, task_gid: str) -> Optional[float]:
+        """
+        Get the actual time in minutes for a task.
+        """
+        task = self.tasks_api.get_task(task_gid, opts={'opt_fields': 'actual_time_minutes'})
+        return task.get('actual_time_minutes')
+
+    def add_time_entry(self, task_gid: str, duration_seconds: int, entered_on: Optional[datetime.date] = None):
+        """
+        Add a time tracking entry to a task.
+        """
+        if entered_on is None:
+            entered_on = datetime.date.today()
+        duration_minutes = int(duration_seconds // 60)
+        if duration_minutes == 0:
+            # round up to one minute
+            duration_minutes = 1
+
+        data = {
+            "duration_minutes": duration_minutes,
+            "entered_on": entered_on.isoformat()
+        }
+        body = {"data": data}
+        self.time_tracking_api.create_time_tracking_entry(body, task_gid, opts={})

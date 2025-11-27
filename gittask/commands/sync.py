@@ -37,11 +37,18 @@ def sync():
         
         for session in track(sessions_to_sync, description="Syncing..."):
             try:
-                client.log_time_comment(
-                    session['task_gid'],
-                    session['duration_seconds'],
-                    session['branch']
-                )
+                if config.get_paid_plan_status():
+                    # Only possible to log time on paid plans
+                    client.add_time_entry(
+                        session['task_gid'],
+                        session['duration_seconds']
+                    )
+                else: 
+                    client.log_time_comment(
+                        session['task_gid'],
+                        session['duration_seconds'],
+                        session['branch']
+                    )
                 db.mark_session_synced(session['id'])
             except Exception as e:
                 console.print(f"[red]Failed to sync session {session['id']}: {e}[/red]")
