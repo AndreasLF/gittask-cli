@@ -47,7 +47,10 @@ def finish():
                 
                 if sessions_to_sync:
                     for session in sessions_to_sync:
-                        client.log_time_comment(session['task_gid'], session['duration_seconds'], session['branch'])
+                        if config.get_paid_plan_status():
+                            client.add_time_entry(session['task_gid'], session['duration_seconds'])
+                        else:
+                            client.log_time_comment(session['task_gid'], session['duration_seconds'], session['branch'])
                         db.mark_session_synced(session['id'])
                     console.print(f"[green]Synced {len(sessions_to_sync)} sessions.[/green]")
                 else:
