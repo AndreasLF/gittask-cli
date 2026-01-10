@@ -1,6 +1,7 @@
 from textual.app import ComposeResult
+from textual import work
 from textual.screen import Screen
-from textual.widgets import Input, ListView, ListItem, Label, Button
+from textual.widgets import Input, ListView, ListItem, Label, Button, LoadingIndicator
 from textual.containers import Container
 from ...config import ConfigManager
 from ...asana_client import AsanaClient
@@ -14,6 +15,7 @@ class TaskSearch(Screen):
         yield Container(
             Label("Search Asana Tasks"),
             Input(placeholder="Type to search...", id="search-input"),
+            LoadingIndicator(id="loading"),
             ListView(id="results-list"),
             Button("Back to Dashboard", variant="default", id="back-btn")
         )
@@ -33,25 +35,44 @@ class TaskSearch(Screen):
             return
 
         try:
-            with AsanaClient(token) as client:
-                tasks = client.search_tasks(workspace_gid, query)
-                
-                list_view = self.query_one("#results-list", ListView)
-                list_view.clear()
-                
-                for task in tasks:
-                    item = ListItem(Label(task['name']), name=task['gid'])
-                    item.task_name = task['name']
-                    list_view.append(item)
-                    
+            self.query_one("#loading").display = True
+            self.query_one("#results-list").display = False
+            self._search_worker(query, token, workspace_gid)
         except Exception as e:
             self.notify(f"Search failed: {e}", severity="error")
+
+    @work(exclusive=True, thread=True)
+    def _search_worker(self, query: str, token: str, workspace_gid: str) -> None:
+        try:
+            with AsanaClient(token) as client:
+                tasks = client.search_tasks(workspace_gid, query)
+            self.app.call_from_thread(self._update_results, tasks)
+        except Exception as e:
+            self.app.call_from_thread(self._handle_search_error, e)
+
+    def _update_results(self, tasks: list) -> None:
+        self.query_one("#loading").display = False
+        list_view = self.query_one("#results-list")
+        list_view.display = True
+        list_view.clear()
+        
+        for task in tasks:
+            item = ListItem(Label(task['name']), name=task['gid'])
+            item.task_name = task['name']
+            list_view.append(item)
+            
+    def _handle_search_error(self, error: Exception) -> None:
+        self.query_one("#loading").display = False
+        self.query_one("#results-list").display = True
+        self.notify(f"Search failed: {error}", severity="error")
 
     def on_screen_resume(self) -> None:
         # Clear previous state
         self.query_one("#search-input", Input).value = ""
         self.query_one("#results-list", ListView).clear()
         self.query_one("#search-input", Input).focus()
+        self.query_one("#loading").display = False
+        self.query_one("#results-list").display = True
 
     def on_list_view_selected(self, event: ListView.Selected) -> None:
         task_gid = event.item.name
