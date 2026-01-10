@@ -46,15 +46,20 @@ class TaskSearch(Screen):
         try:
             with AsanaClient(token) as client:
                 tasks = client.search_tasks(workspace_gid, query)
-            self.app.call_from_thread(self._update_results, tasks)
+            self.app.call_from_thread(self._update_results, tasks, query)
         except Exception as e:
             self.app.call_from_thread(self._handle_search_error, e)
 
-    def _update_results(self, tasks: list) -> None:
+    def _update_results(self, tasks: list, query: str) -> None:
         self.query_one("#loading").display = False
         list_view = self.query_one("#results-list")
         list_view.display = True
         list_view.clear()
+        
+        # Add "Create Task" option
+        create_item = ListItem(Label(f"[+] Create task \"{query}\""), name="create_new_task")
+        create_item.task_name = query
+        list_view.append(create_item)
         
         for task in tasks:
             item = ListItem(Label(task['name']), name=task['gid'])
@@ -75,9 +80,44 @@ class TaskSearch(Screen):
         self.query_one("#results-list").display = True
 
     def on_list_view_selected(self, event: ListView.Selected) -> None:
-        task_gid = event.item.name
+        if event.item.name == "create_new_task":
+            task_name = getattr(event.item, 'task_name', 'New Task')
+            self.create_task(task_name)
+            return
+
         task_gid = event.item.name
         task_name = getattr(event.item, 'task_name', 'Unknown Task')
+        
+        from .task_options import TaskOptionsModal
+        self.app.push_screen(TaskOptionsModal(task_name, task_gid), self.handle_options)
+
+    def create_task(self, task_name: str) -> None:
+        self.query_one("#loading").display = True
+        self.query_one("#results-list").display = False
+        self._create_task_worker(task_name)
+
+    @work(exclusive=True, thread=True)
+    def _create_task_worker(self, task_name: str) -> None:
+        try:
+            config = ConfigManager()
+            token = config.get_api_token()
+            workspace_gid = config.get_default_workspace()
+            project_gid = config.get_default_project()
+            
+            with AsanaClient(token) as client:
+                new_task = client.create_task(workspace_gid, project_gid, task_name)
+                
+            self.app.call_from_thread(self._on_task_created, new_task)
+            
+        except Exception as e:
+            self.app.call_from_thread(self._handle_search_error, e)
+
+    def _on_task_created(self, task: dict) -> None:
+        self.query_one("#loading").display = False
+        self.query_one("#results-list").display = True
+        
+        task_gid = task['gid']
+        task_name = task['name']
         
         from .task_options import TaskOptionsModal
         self.app.push_screen(TaskOptionsModal(task_name, task_gid), self.handle_options)
