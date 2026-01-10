@@ -31,6 +31,7 @@ class TaskCard(Static):
             self.start_time = None
 
     def compose(self) -> ComposeResult:
+        yield Button("🗑️", id="trash-btn", classes="trash-btn")
         yield Label(self.task_name, classes="task-name")
         yield Label(self.branch_name, classes="branch-name")
         yield Label("00:00:00", classes="timer", id=f"timer-{self.id}")
@@ -124,6 +125,9 @@ class TaskCard(Static):
             except Exception as e:
                 self.notify(f"Failed to push: {e}", title="Push Error", severity="error")
 
+        elif button_id == "trash-btn":
+            self.post_message(self.TaskRemovalRequested(self.task_data))
+
     class StatusChanged(Message):
         """Sent when task status changes (start/stop)."""
         pass
@@ -132,4 +136,10 @@ class TaskCard(Static):
         """Sent when checkout is requested."""
         def __init__(self, branch: str):
             self.branch = branch
+            super().__init__()
+
+    class TaskRemovalRequested(Message):
+        """Sent when task removal is requested."""
+        def __init__(self, task_data: dict):
+            self.task_data = task_data
             super().__init__()

@@ -6,6 +6,9 @@ from textual.containers import Container
 from ...config import ConfigManager
 from ...asana_client import AsanaClient
 from ...database import DBManager
+from ...git_handler import GitHandler
+import subprocess
+import sys
 
 class TaskSearch(Screen):
     def __init__(self, **kwargs):
@@ -182,13 +185,13 @@ class TaskSearch(Screen):
             # The modal has task_name and task_gid. It should probably include them in result.
             pass
             
-        elif action == "create_branch":
+        if action == "create_branch":
             branch_name = result.get("branch_name")
-            self.perform_checkout(branch_name, create_new=True)
+            self.perform_checkout(branch_name, create_new=True, task_name=result.get("task_name"), task_gid=result.get("task_gid"))
             
         elif action == "checkout_existing":
             branch_name = result.get("branch_name")
-            self.perform_checkout(branch_name, create_new=False)
+            self.perform_checkout(branch_name, create_new=False, task_name=result.get("task_name"), task_gid=result.get("task_gid"))
 
     def start_global_tracking(self, task_name: str, task_gid: str) -> None:
         # Start global session
@@ -201,36 +204,51 @@ class TaskSearch(Screen):
         self.notify(f"Started tracking: {task_name}")
         self.app.action_navigate("dashboard")
 
-    def perform_checkout(self, branch_name: str, create_new: bool) -> None:
+    def perform_checkout(self, branch_name: str, create_new: bool, task_name: str = None, task_gid: str = None) -> None:
         self.notify(f"Checking out {branch_name}...")
-        self.run_worker(self._checkout_worker(branch_name, create_new))
+        self._checkout_worker(branch_name, create_new, task_name, task_gid)
 
-    async def _checkout_worker(self, branch_name: str, create_new: bool) -> None:
-        import sys
-        import asyncio
+    @work(exclusive=True, thread=True)
+    def _checkout_worker(self, branch_name: str, create_new: bool, task_name: str = None, task_gid: str = None) -> None:
         from .log_view import LogScreen
         
+        # Pre-link if we have task info
+        if task_name and task_gid:
+            try:
+                git = GitHandler()
+                repo_path = git.get_repo_root()
+                db = DBManager()
+                config = ConfigManager()
+                
+                # Link it
+                db.link_branch_to_task(
+                    branch_name,
+                    repo_path,
+                    task_gid, 
+                    task_name, 
+                    project_gid=config.get_default_project() or "", 
+                    workspace_gid=config.get_default_workspace() or ""
+                )
+            except Exception as e:
+                self.app.call_from_thread(self.notify, f"Failed to pre-link task: {e}", severity="warning")
+
         cmd = [sys.executable, "-m", "gittask.main", "checkout", branch_name]
         if create_new:
             cmd.append("-b")
             
         try:
-            process = await asyncio.create_subprocess_exec(
-                *cmd,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE
-            )
-            stdout, stderr = await process.communicate()
-            output = stdout.decode() + stderr.decode()
+            # Use subprocess.run for sync execution in thread
+            result = subprocess.run(cmd, capture_output=True, text=True)
+            output = result.stdout + result.stderr
             
-            if process.returncode == 0:
-                self.notify(f"Checked out {branch_name}")
-                self.app.action_navigate("dashboard")
+            if result.returncode == 0:
+                self.app.call_from_thread(self.notify, f"Checked out {branch_name}")
+                self.app.call_later(self.app.action_navigate, "dashboard")
             else:
-                self.app.push_screen(LogScreen("Checkout Failed", output))
+                self.app.call_from_thread(self.app.push_screen, LogScreen("Checkout Failed", output))
                 
         except Exception as e:
-            self.notify(f"Checkout failed: {e}", severity="error")
+            self.app.call_from_thread(self.notify, f"Checkout failed: {e}", severity="error")
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "back-btn":

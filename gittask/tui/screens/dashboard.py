@@ -10,10 +10,12 @@ import time
 class Dashboard(Screen):
     def __init__(self, **kwargs):
         super().__init__(id="dashboard", **kwargs)
+        self.last_active_session_id = None
 
     def compose(self) -> ComposeResult:
         yield Container(
-            VerticalScroll(id="task-grid", classes="task-grid"),
+            Label("⚠️  GUI is experimental (help build the project at https://github.com/AndreasLF/gittask-cli)", classes="experimental-notice"),
+            Container(id="task-grid", classes="task-grid"),
             Horizontal(
                 Button("New Task", variant="success", id="new-task-btn"),
                 Button("Sync", variant="primary", id="sync-btn"),
@@ -27,6 +29,22 @@ class Dashboard(Screen):
 
     def on_mount(self) -> None:
         self.refresh_tasks()
+        self.set_interval(2.0, self.check_for_changes)
+
+    def check_for_changes(self) -> None:
+        try:
+            db = DBManager()
+            active = db.get_active_session()
+            active_id = str(active.doc_id) if active else "None"
+            
+            # Also check if the branch map changed? 
+            # For now, just checking active session is a good start for "tracked task changed"
+            # To be more robust, we could hash the relevant parts of the DB or just refresh if active session changes.
+            
+            if active_id != self.last_active_session_id:
+                self.refresh_tasks()
+        except Exception:
+            pass
 
     def on_screen_resume(self) -> None:
         self.refresh_tasks()
@@ -41,6 +59,9 @@ class Dashboard(Screen):
         
         tasks_to_show = []
         seen_branches = set()
+        
+        # Update last active session tracking
+        self.last_active_session_id = str(active.doc_id) if active else "None"
         
         # Prioritize active session
         if active:
@@ -89,6 +110,26 @@ class Dashboard(Screen):
     def on_task_card_checkout_requested(self, message: TaskCard.CheckoutRequested) -> None:
         self.notify(f"Checking out {message.branch}...")
         self.run_worker(self.perform_checkout(message.branch))
+
+    def on_task_card_task_removal_requested(self, message: TaskCard.TaskRemovalRequested) -> None:
+        db = DBManager()
+        branch = message.task_data.get('branch')
+        repo_path = message.task_data.get('repo_path')
+        
+        if not repo_path:
+             # Try to get from git handler if not in data (fallback)
+             try:
+                 from ...git_handler import GitHandler
+                 repo_path = GitHandler().get_repo_root()
+             except:
+                 pass
+
+        if branch and repo_path:
+            db.remove_branch_link(branch, repo_path)
+            self.notify(f"Removed {branch} from dashboard")
+            self.refresh_tasks()
+        else:
+            self.notify("Could not identify task to remove", severity="error")
 
     async def perform_checkout(self, branch: str) -> None:
         import sys
